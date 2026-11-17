@@ -6,12 +6,14 @@ use App\Models\Activity;
 use App\Models\Workspace;
 use App\Models\WorkspaceAiKey;
 use App\Support\Ai\AiProviders;
+use App\Support\Audit\AuditContext;
 use App\Support\Audit\Audited;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 use RuntimeException;
 
 class WorkspaceAiController extends Controller
@@ -78,6 +80,9 @@ class WorkspaceAiController extends Controller
         $deleted = WorkspaceAiKey::query()->where('workspace_id', $workspace->id)->where('provider', $provider)->delete();
         if ($deleted > 0) {
             Activity::record($workspace, 'ai.disconnect', AiProviders::PROVIDERS[$provider]['label'], null, $request->user());
+            Inertia::flash('toast', ['type' => 'success', 'message' => 'Removed the '.AiProviders::PROVIDERS[$provider]['label'].' key.']);
+        } else {
+            AuditContext::nothingChanged();
         }
 
         return back();

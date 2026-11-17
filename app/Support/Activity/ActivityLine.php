@@ -337,7 +337,7 @@ final class ActivityLine
                 : $set('skipped a repeat push', $t(':commit to :branch already ran', ['commit' => (string) ($meta['commit'] ?? ''), 'branch' => (string) ($meta['branch'] ?? '')]), 'warn'),
             'ai.connect' => $set('connected their own AI key:', null, 'warn'),
             'ai.update' => $set('changed their AI key for'),
-            'ai.disconnect' => $set('disconnected their AI key for', null, 'warn'),
+            'ai.disconnect' => $set('removed their AI key for', null, 'warn'),
             'fix.start' => $set('asked the agent to look into'),
             'fix.approve' => $set('approved the agent’s fix', $t((int) ($meta['steps'] ?? 0) === 1 ? ':count step' : ':count steps', ['count' => (int) ($meta['steps'] ?? 0)]), 'warn'),
             'fix.decline' => $set('turned down the agent’s fix'),

@@ -60,13 +60,13 @@ const open = computed({
 });
 
 const form = useForm({ key: '', model: '' });
-const confirmingDisconnect = ref(false);
+const confirmingRemove = ref(false);
 
 function show(p: AiProvider): void {
     form.reset();
     form.clearErrors();
     form.model = p.model ?? '';
-    confirmingDisconnect.value = false;
+    confirmingRemove.value = false;
     openFor.value = p.provider;
 }
 
@@ -79,11 +79,11 @@ function save(): void {
     });
 }
 
-function disconnect(): void {
+function removeKey(): void {
     const p = current.value;
     if (!p) return;
-    if (!confirmingDisconnect.value) {
-        confirmingDisconnect.value = true;
+    if (!confirmingRemove.value) {
+        confirmingRemove.value = true;
 
         return;
     }
@@ -173,6 +173,12 @@ const field =
                         :class="appButtonClasses('secondary', 'sm')"
                         aria-hidden="true"
                         >{{ $t('Connect') }}</span
+                    >
+                    <span
+                        v-if="p.connected && canManage"
+                        :class="appButtonClasses('secondary', 'sm')"
+                        aria-hidden="true"
+                        >{{ $t('Manage') }}</span
                     >
                 </button>
             </li>
@@ -312,12 +318,12 @@ const field =
                         v-if="current.connected"
                         type="button"
                         :class="appButtonClasses('danger', 'md', focusRing)"
-                        @click="disconnect"
+                        @click="removeKey"
                     >
                         {{
-                            confirmingDisconnect
-                                ? $t('Disconnect, sure?')
-                                : $t('Disconnect')
+                            confirmingRemove
+                                ? $t('Remove key, sure?')
+                                : $t('Remove key')
                         }}
                     </button>
                     <button
