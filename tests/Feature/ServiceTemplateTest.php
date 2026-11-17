@@ -478,7 +478,37 @@ test('the deploy dialog learns which names and ports are taken, so a second data
 
     $this->actingAs($workspace->owner)->getJson($url.'/taken')
         ->assertOk()
-        ->assertExactJson(['services' => ['postgres', 'shop'], 'ports' => [80, 5432], 'proxy' => null, 'canChooseProxy' => false]);
+        ->assertExactJson(['services' => ['postgres', 'shop'], 'ports' => [80, 5432], 'proxy' => null, 'canChooseProxy' => false, 'canChooseHttps' => false]);
 
     $this->actingAs(User::factory()->create())->getJson($url.'/taken')->assertForbidden();
+});
+
+test('the deploy dialog can install a template that ships its own Compose file, sending the fields it leaves empty as null', function () {
+    [$workspace, , $url] = templateMachine();
+
+    // What DeployServiceDialog posts for Excalidraw: every field the
+    // template doesn't use comes through as null, not missing.
+    $this->actingAs($workspace->owner)->postJson($url, [
+        'template' => 'excalidraw',
+        'service' => 'excalidraw',
+        'port' => 8085,
+        'repo' => null,
+        'commit' => null,
+        'health_path' => null,
+        'compose_file' => null,
+        'domain' => null,
+        'proxy' => null,
+    ])->assertAccepted();
+
+    expect(sentJob()['compose_file'])->toBe('compose.yaml');
+});
+
+test('a template that doesn\'t run a Compose file from the repository still turns down a compose_file', function () {
+    [$workspace, , $url] = templateMachine();
+
+    $this->actingAs($workspace->owner)->postJson($url, [
+        'template' => 'excalidraw',
+        'service' => 'excalidraw',
+        'compose_file' => 'docker/compose.yaml',
+    ])->assertUnprocessable()->assertJsonValidationErrors('compose_file');
 });
