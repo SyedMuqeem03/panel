@@ -57,11 +57,14 @@ class WorkflowEngine
         private readonly Environments $environments,
     ) {}
 
-    /** @param  array<string, mixed>  $data */
-    public function start(Workflow $workflow, string $kind, string $summary, array $data = [], ?User $user = null, bool $limited = true): ?WorkflowRun
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  bool  $paid  the run is paid for some other way (an agent on a package's machine), so it needs no plan
+     */
+    public function start(Workflow $workflow, string $kind, string $summary, array $data = [], ?User $user = null, bool $limited = true, bool $paid = false): ?WorkflowRun
     {
         $workspace = $workflow->workspace;
-        if (! $workspace->hasAutomations()) {
+        if (! $paid && ! $workspace->hasAutomations()) {
             return null;
         }
         if ($limited && $workflow->runs()->where('started_at', '>=', now()->subHour())->count() >= Workflow::RUNS_PER_HOUR) {
@@ -511,7 +514,10 @@ class WorkflowEngine
         if (! str_starts_with($key, 'docker:')) {
             return ['state' => 'failed', 'message' => 'Agents run inside containers; '.$service['name'].' isn’t one.'];
         }
-        if (! $user->hasEnabledTwoFactorAuthentication()) {
+        // On a package's own machine (ServerOS's) the agent runs nothing of
+        // theirs, so it isn't the reason for two-factor that their own
+        // machines are.
+        if ($machine->hosted_by === null && ! $user->hasEnabledTwoFactorAuthentication()) {
             return ['state' => 'failed', 'message' => "{$user->name} needs two-factor authentication on for workflows to run agents as them."];
         }
 
@@ -546,6 +552,14 @@ class WorkflowEngine
             }
         }
         $kept = ['summary' => $outcome['summary'], 'pr' => $outcome['pr'], 'model' => $outcome['model']];
+        try {
+            $shots = AgentShots::keep($run, $job);
+            if ($shots !== []) {
+                $kept['shots'] = $shots;
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
         $agent = AgentSpec::AGENTS[(string) ((((array) $node['rules'])['agent'] ?? '') ?: 'claude')] ?? 'The agent';
         $by = $outcome['model'] !== null ? " ({$agent}, {$outcome['model']})" : " ({$agent})";
 
@@ -618,9 +632,9 @@ class WorkflowEngine
     private function openAgentPullRequest(WorkflowRun $run, string $nodeId, array $rules, DaemonJob $job, array $outcome): ?string
     {
         $workflow = $run->workflow;
-        $user = $workflow->runAs;
+        $user = AgentSpec::actor($run);
         if ($user === null || ! $workflow->workspace->allows($user, WorkspacePermission::ManageMachines)) {
-            throw new RuntimeException('Whoever last saved this workflow can no longer manage machines. Save it again as someone who can.');
+            throw new RuntimeException('Whoever started this can no longer manage machines.');
         }
         $changes = AgentSpec::changes($job);
         if ($changes['files'] === []) {
@@ -632,7 +646,7 @@ class WorkflowEngine
             ?? throw new RuntimeException("ServerOS’s GitHub App can’t write to {$owner}/{$name}. Let it write to the repository, then run this again.");
 
         return $github->openPullRequest($token, $owner, $name, $changes['base'], AgentSpec::branch($run, $rules), AgentSpec::pullRequestBranch($run, $nodeId),
-            $changes['files'], AgentSpec::commitMessage($run, $rules, $outcome), AgentSpec::title($run, $rules), AgentSpec::pullRequestBody($run, $rules, $outcome));
+            $changes['files'], AgentSpec::commitMessage($run, $rules, $outcome), AgentSpec::title($run, $rules), AgentSpec::pullRequestBody($run, $rules, $outcome, (array) ($run->steps[$nodeId]['shots'] ?? [])));
     }
 
     /**
@@ -1027,9 +1041,11 @@ class WorkflowEngine
             return [null, null, 'The machine is gone, or this trigger isn’t about one.'];
         }
         $workflow = $run->workflow;
-        $user = $workflow->runAs;
+        $user = AgentSpec::actor($run);
         if ($user === null || ! $workflow->workspace->allows($user, WorkspacePermission::ManageMachines)) {
-            return [$machine, null, 'Whoever last saved this workflow can no longer manage machines. Save it again as someone who can.'];
+            return [$machine, null, ($run->trigger['kind'] ?? null) === 'agent_task'
+                ? 'Whoever started this agent can no longer manage machines.'
+                : 'Whoever last saved this workflow can no longer manage machines. Save it again as someone who can.'];
         }
         if (($reason = $this->queue->unavailable($machine)) !== null) {
             return [$machine, $user, $reason];

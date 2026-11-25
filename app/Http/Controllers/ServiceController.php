@@ -18,7 +18,8 @@ class ServiceController extends Controller
 {
     public function index(Workspace $workspace, ServiceTemplateCatalog $templates): Response
     {
-        $machines = $workspace->machines()->orderBy('name')->get();
+        // ServerOS's agent machines live on the Agents side.
+        $machines = $workspace->countedMachines()->orderBy('name')->get();
 
         return Inertia::render('workspace/Services', [
             'workspace' => $workspace->toPageProps(),

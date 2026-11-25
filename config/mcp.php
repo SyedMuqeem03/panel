@@ -13,6 +13,7 @@ return [
         Tools\MonitorTools::class,
         Tools\StatusPageTools::class,
         Tools\WorkflowTools::class,
+        Tools\AgentTools::class,
         Tools\BackupTools::class,
         Tools\LogTools::class,
         Tools\TeamTools::class,

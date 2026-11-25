@@ -54,6 +54,7 @@ import TickBox from '@/components/workspace/TickBox.vue';
 import WorkspacePage from '@/components/workspace/WorkspacePage.vue';
 import { appButtonClasses } from '@/lib/appButton';
 import { docsUrl } from '@/lib/docs';
+import { timeUnits } from '@/lib/formatting';
 import { toast } from '@/lib/toast';
 import type { Workspace, WorkspaceAccess } from '@/types';
 
@@ -785,14 +786,15 @@ const pullRequestUrl = computed(() =>
 
 function ago(iso: string | null): string {
     if (!iso) return '';
-    const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    const { minutes, hours, days } = timeUnits(
+        Date.now() - new Date(iso).getTime(),
+    );
     if (minutes < 1) return trans('just now');
     if (minutes < 60)
         return trans(':count min ago', { count: String(minutes) });
-    const hours = Math.round(minutes / 60);
     if (hours < 24) return trans(':count h ago', { count: String(hours) });
 
-    return trans(':count d ago', { count: String(Math.round(hours / 24)) });
+    return trans(':count d ago', { count: String(days) });
 }
 </script>
 
@@ -2199,6 +2201,10 @@ function ago(iso: string | null): string {
                                 $t(
                                     'Each pull request gets its own copy of :env on the machine you pick, running the pull request’s code. New commits deploy it again, and it’s removed when the pull request closes. Pull requests from forks never get one.',
                                     { env: environments[0]?.name ?? '' },
+                                ) +
+                                ' ' +
+                                $t(
+                                    'Nor does a project with an app that runs its repository’s own Compose file, since that file can control Docker on the machine.',
                                 ) +
                                 ' '
                             }}

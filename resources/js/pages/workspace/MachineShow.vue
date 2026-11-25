@@ -3,6 +3,7 @@ import { themeColour } from '@/lib/themeColour';
 import { useUpgradeLink } from '@/composables/useUpgradeLink';
 import { trans } from 'laravel-vue-i18n';
 import DiskUsagePanel from '@/components/machines/DiskUsagePanel.vue';
+import DockerPanel from '@/components/machines/DockerPanel.vue';
 import ProviderName from '@/components/machines/ProviderName.vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
@@ -39,6 +40,7 @@ import {
     watch,
 } from 'vue';
 import { appButtonClasses } from '@/lib/appButton';
+import { fixed } from '@/lib/formatting';
 import { toast } from '@/lib/toast';
 import type { Machine } from '@/components/machines/machines';
 import FileBrowser from '@/components/machines/FileBrowser.vue';
@@ -101,6 +103,9 @@ const upgrade = useUpgradeLink();
 const DeployServiceDialog = defineAsyncComponent(
     () => import('@/components/workspace/DeployServiceDialog.vue'),
 );
+
+// ?deploy=coding-agent opens the deploy dialog on that template.
+const deployTemplate = ref<string | null>(null);
 
 type ScheduledTask = {
     command: string;
@@ -507,7 +512,7 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
 function formatBytes(bytes: number | undefined): string {
     if (!bytes || bytes < 0) return trans('Unknown');
-    return `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
+    return `${fixed(bytes / 1024 ** 3)} GiB`;
 }
 
 function formatDate(timestamp: number | undefined): string {
@@ -629,6 +634,8 @@ onMounted(() => {
         new URLSearchParams(window.location.search).has('deploy') &&
         canDeploy.value
     ) {
+        deployTemplate.value =
+            new URLSearchParams(window.location.search).get('deploy') || null;
         showDeploy.value = true;
     }
 
@@ -1479,6 +1486,16 @@ function usage(mount: string): { percent: number; free: number } | null {
                     :can-manage="canManage"
                     :online="online"
                 />
+                <template v-if="consoleContainers.length && canManage">
+                    <h3 class="pt-2 text-sm font-medium">
+                        {{ $t('Docker images and volumes') }}
+                    </h3>
+                    <DockerPanel
+                        :machine-id="machine.id!"
+                        :can-manage="canManage"
+                        :online="online"
+                    />
+                </template>
                 <h3 class="pt-2 text-sm font-medium">
                     {{ $t('Network interfaces') }}
                 </h3>
@@ -1738,6 +1755,7 @@ function usage(mount: string): { percent: number; free: number } | null {
             v-model:open="showDeploy"
             :templates="templates"
             :machine-id="machine.id"
+            :start-with="deployTemplate"
             @deployed="onDeployed"
         />
         <MaintenanceDialog

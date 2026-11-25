@@ -36,8 +36,9 @@ class MachineController extends Controller
     {
         return Inertia::render('workspace/Machines', [
             'workspace' => $workspace->toPageProps(),
+            // ServerOS's agent machines live on the Agents side.
             'machines' => MachineResource::collection(
-                $workspace->machines()->orderBy('name')->get(),
+                $workspace->countedMachines()->orderBy('name')->get(),
             )->resolve(),
             'machineGroups' => $workspace->machineGroups()->orderBy('name')->get()
                 ->map(fn (MachineGroup $group) => ['id' => $group->id, 'name' => $group->name, 'policyId' => $group->machine_policy_id])
